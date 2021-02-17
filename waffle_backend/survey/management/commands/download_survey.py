@@ -6,7 +6,7 @@ from survey.models import OperatingSystem, SurveyResult
 def download_survey():
     # NOTE: if you run this command multiple times, rows of 'survey_surveyresult' table will be added repeatedly.
 
-    path = ''  # NOTE: you should assign proper directory path
+    path = '/Users/moonhulk/Desktop/waffle-rookies-18.5-backend-2/waffle_backend'  # NOTE: you should assign proper directory path
     if not path:
         raise Exception("Please specify path of directory including 'example_surveyresult.tsv'!")
     tsv_file = f"{path}/example_surveyresult.tsv"

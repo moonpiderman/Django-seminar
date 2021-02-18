@@ -1,7 +1,7 @@
 from django.contrib.auth.models import User
 from django.db import models
 
-class ParticipnatProfile(models.Model):
+class ParticipantProfile(models.Model):
     user = models.OneToOneField(User, null=True, related_name='participant', on_delete=models.SET_NULL)
     university = models.CharField(max_length=50, blank=True)
     accepted = models.BooleanField(default=True)

@@ -28,6 +28,15 @@ class UserViewSet(viewsets.GenericViewSet):
         except IntegrityError:
             return Response({"error": "A user with that username already exists."}, status=status.HTTP_400_BAD_REQUEST)
 
+        role = request.data.get('role')
+        if role != 'participant' and role != 'instructor' :
+            try:
+                return Response({"error": "You did not insert role."},status=status.HTTP_400_BAD_REQUEST)
+            except:
+                user.user_seminar = role
+
+
+
         login(request, user)
 
         data = serializer.data

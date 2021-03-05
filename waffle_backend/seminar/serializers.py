@@ -1,43 +1,64 @@
-from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
 from rest_framework import serializers
-from rest_framework.authtoken.models import Token
+
+from seminar.models import Seminar, UserSeminar
 
 
 class SeminarSerializer(serializers.ModelSerializer):
-    email = serializers.EmailField(allow_blank=False)
-    password = serializers.CharField(write_only=True)
-    first_name = serializers.CharField(required=False)
-    last_name = serializers.CharField(required=False)
-    last_login = serializers.DateTimeField(read_only=True)
-    date_joined = serializers.DateTimeField(read_only=True)
+    time = serializers.TimeField(format='%H:%M', input_formats=['%H:%M'])
+    instructors = serializers.SerializerMethodField()
+    # participants = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Seminar
+        fields = (
+            'id',
+            'name',
+            'capacity',
+            'count',
+            'time',
+            'online',
+            'instructors',
+            # 'participants',
+        )
+
+    def get_instructors(self, seminar):
+        instructors_seminar = seminar.user_seminar.filter(role=UserSeminar.INSTRUCTOR)
+        return InstructorsOfSeminarSerializer(instructors_seminar, many=True, context=self.context).data
+
+    # def get_participants(self, seminar):
+
+class InstructorsOfSeminarSerializer(serializers.ModelSerializer):
+    id = serializers.IntegerField(source='user.id')
+    username = serializers.CharField(source='user.username')
+    email = serializers.EmailField(source='user.email')
+    first_name = serializers.CharField(source='user.first_name')
+    last_name = serializers.CharField(source='user.last_name')
+    joined_at = serializers.DateTimeField(source='created_at')
+
+    class Meta:
+        model = UserSeminar
+        fields = (
+            'id',
+            'username',
+            'email',
+            'first_name',
+            'last_name',
+            'joined_at',
+        )
+
+class ParticipantsOfSeminarSerializer(serializers.ModelSerializer):
+    is_active = serializers.BooleanField(default=True)
+    dropped_at = serializers.DateTimeField(read_only=True)
 
     class Meta:
         model = User
         fields = (
             'id',
             'username',
-            'email',
-            'password',
             'first_name',
             'last_name',
-            'last_login',
-            'date_joined',
+            'joined_at',
+            'is_active',
+            'dropped_at',
         )
-
-    def validate_password(self, value):
-        return make_password(value)
-
-    def validate(self, data):
-        first_name = data.get('first_name')
-        last_name = data.get('last_name')
-        if bool(first_name) ^ bool(last_name):
-            raise serializers.ValidationError("First name and last name should appear together.")
-        if first_name and last_name and not (first_name.isalpha() and last_name.isalpha()):
-            raise serializers.ValidationError("First name or last name should not have number.")
-        return data
-
-    def create(self, validated_data):
-        user = super(SeminarSerializer, self).create(validated_data)
-        Token.objects.create(user=user)
-        return user

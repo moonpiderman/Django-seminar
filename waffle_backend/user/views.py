@@ -7,7 +7,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from seminar.models import UserSeminar
+from seminar.models import UserSeminar, Seminar
 from user.models import ParticipantProfile, InstructorProfile
 
 from user.serializers import UserSerializer
@@ -32,6 +32,9 @@ class UserViewSet(viewsets.GenericViewSet):
             return Response({"error": "A user with that username already exists."}, status=status.HTTP_400_BAD_REQUEST)
 
         role = request.data.get('role')
+
+        seminar = request.data.get('seminar')
+
         university = request.data.get('university') or ""
         accepted = request.data.get('accepted')
         company = request.data.get('company') or ""
@@ -42,9 +45,11 @@ class UserViewSet(viewsets.GenericViewSet):
 
         elif role == 'participant':
             ParticipantProfile.objects.create(user=user, university=university, accepted=accepted)
+            UserSeminar.objects.create(user=user, role=role)
 
         elif role == 'instructor':
             InstructorProfile.objects.create(user=user, company=company, year=year)
+            UserSeminar.objects.create(user=user, role=role, seminar=seminar)
 
         serializer.save()
 

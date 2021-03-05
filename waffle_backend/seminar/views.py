@@ -1,22 +1,24 @@
-from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.models import User
-from django.db import IntegrityError
+from django.db import transaction
+from django.utils import timezone
 from rest_framework import status, viewsets
-from rest_framework.authtoken.models import Token
 from rest_framework.decorators import action
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 
-from seminar.serializers import SeminarSerializer
+# from django.contrib.auth.decorators import login_required
+# from user.views import UserViewSet
+
+from seminar.models import Seminar, UserSeminar
+from seminar.serializers import SeminarSerializer, InstructorsOfSeminarSerializer
 
 
 class SeminarViewSet(viewsets.GenericViewSet):
-    queryset = User.objects.all()
+    queryset = Seminar.objects.all()
     serializer_class = SeminarSerializer
     permission_classes = (IsAuthenticated(), )
 
     def get_permissions(self):
-        if self.action in ('create', 'login'):
+        if self.action in ('create', 'update', 'user'):
             return (AllowAny(), )
         return self.permission_classes
 
@@ -24,48 +26,81 @@ class SeminarViewSet(viewsets.GenericViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
-            user = serializer.save()
-        except IntegrityError:
-            return Response({"error": "A user with that username already exists."}, status=status.HTTP_400_BAD_REQUEST)
+            serializer.save()
+        except InterruptedError:
+            return Response({"error": "A seminar with that seminarname already exists."}, status=status.HTTP_400_BAD_REQUEST)
 
-        login(request, user)
+        serializer.save()
 
         data = serializer.data
-        data['token'] = user.auth_token.key
         return Response(data, status=status.HTTP_201_CREATED)
 
-    @action(detail=False, methods=['PUT'])
-    def login(self, request):
-        username = request.data.get('username')
-        password = request.data.get('password')
-
-        user = authenticate(request, username=username, password=password)
-        if user:
-            login(request, user)
-
-            data = self.get_serializer(user).data
-            token, created = Token.objects.get_or_create(user=user)
-            data['token'] = token.key
-            return Response(data)
-
-        return Response({"error": "Wrong username or wrong password"}, status=status.HTTP_403_FORBIDDEN)
-
-    @action(detail=False, methods=['POST'])
-    def logout(self, request):
-        logout(request)
-        return Response()
-
-    def retrieve(self, request, pk=None):
-        user = request.user if pk == 'me' else self.get_object()
-        return Response(self.get_serializer(user).data)
-
     def update(self, request, pk=None):
-        if pk != 'me':
-            return Response({"error": "Can't update other Users information"}, status=status.HTTP_403_FORBIDDEN)
-
         user = request.user
+        seminar = self.get_object()
 
-        serializer = self.get_serializer(user, data=request.data, partial=True)
+        if not user.user_seminar.filter(seminar=seminar, role=UserSeminar.INSTRUCTOR).exists():
+            Response({"error": "You're not charge in this seminar."}, status=status.HTTP_403_FORBIDDEN)
+
+        data = request.data
+
+        serializer = self.get_serializer(seminar, data=data, partial=True)
         serializer.is_valid(raise_exception=True)
-        serializer.update(user, serializer.validated_data)
-        return Response(serializer.data)
+
+
+        serializer.update(seminar, serializer.validated_data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    # @login_required
+    @action(detail=True, methods=['POST', 'DELETE'])
+    def user(self, request, pk):
+        # user = self.request.user
+        seminar = self.get_object()
+
+        # if user is not None:
+        #     UserViewSet.login(self, user)
+
+        # if not self.request.user.is_authenticated:
+        #     return Response({"error": "You must be login."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if self.request.method == 'POST':
+            return self.join_seminar(seminar)
+        # else :
+        #     return self.delete_seminar(seminar)
+
+
+    def join_seminar(self, seminar):
+        user = self.request.user
+        role = self.request.data.get('role')
+
+        if not role == 'participant' and not role == 'instructor':
+            return Response({"error": "You need to put your role."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if user.user_seminar.filter(seminar=seminar).exists():
+            return Response({"error": "Do not authenticate in a seminar."}, status=status.HTTP_403_FORBIDDEN)
+
+        if role == UserSeminar.PARTICIPANT:
+            add_capacity = seminar.now_capacity + 1
+            if not hasattr(user, 'participant'):
+                return Response({"error": "You're not a participant in a seminar."}, status=status.HTTP_403_FORBIDDEN)
+
+            # acception check
+            if not user.participant.accepted:
+                return Response({"error": "You're not accepted in a seminar."}, status=status.HTTP_403_FORBIDDEN)
+
+            # capacity 설정
+            if add_capacity >= seminar.capacity:
+                return Response({"error": "You cannot join this seminar."}, status=status.HTTP_400_BAD_REQUEST)
+
+            elif add_capacity < seminar.capacity:
+                seminar.now_capacity = add_capacity
+
+            UserSeminar.objects.create(user=user, seminar=seminar, role=role)
+            return Response({"Enroll in this seminar as a participant."}, status=status.HTTP_201_CREATED)
+
+        elif role == UserSeminar.INSTRUCTOR:
+            UserSeminar.objects.create(user=user, seminar=seminar, role=role)
+            return Response({"Enroll in this seminar as a instructor."}, status=status.HTTP_201_CREATED)
+
+    # def delete_seminar(self, seminar):
+    #     user = self.request.user

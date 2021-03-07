@@ -6,6 +6,7 @@ from rest_framework.authtoken.models import Token
 
 from seminar.models import UserSeminar
 from user.models import ParticipantProfile, InstructorProfile
+from seminar.serializers import SeminarFromInstructor, SeminarFromParticipant
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -64,6 +65,7 @@ class UserSerializer(serializers.ModelSerializer):
         return None
 
 class ParticipantProfileSerializer(serializers.ModelSerializer):
+    seminars = serializers.SerializerMethodField()
 
     class Meta :
         model = ParticipantProfile
@@ -71,10 +73,17 @@ class ParticipantProfileSerializer(serializers.ModelSerializer):
             'id',
             'university',
             'accepted',
-            # 'seminars',
+            'seminars',
         )
 
+    def get_seminars(self, participant_profile):
+        participant_seminar = participant_profile.user.user_seminar.filter(role=UserSeminar.PARTICIPANT).last()
+        if participant_profile:
+            SeminarFromParticipant(participant_seminar, context=self.context).data
+        return None
+
 class InstructorProfileSerializer(serializers.ModelSerializer):
+    charge = serializers.SerializerMethodField()
 
     class Meta :
         model = InstructorProfile
@@ -82,5 +91,11 @@ class InstructorProfileSerializer(serializers.ModelSerializer):
             'id',
             'company',
             'year',
-            # 'charge',
+            'charge',
         )
+
+    def get_charge(self, instructor_profile):
+        instructor_seminar = instructor_profile.user.user_seminar.filter(role=UserSeminar.INSTRUCTOR).last()
+        if instructor_profile:
+            SeminarFromInstructor(instructor_seminar, context=self.context).data
+        return None

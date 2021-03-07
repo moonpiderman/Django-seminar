@@ -62,3 +62,31 @@ class ParticipantsOfSeminarSerializer(serializers.ModelSerializer):
             'is_active',
             'dropped_at',
         )
+
+class SeminarFromInstructor(serializers.ModelSerializer):
+    id = serializers.IntegerField(source='seminar.id')
+    name = serializers.CharField(source='seminar.name')
+    joined_at = serializers.DateTimeField(source='created_at')
+
+    class Meta:
+        model = UserSeminar
+        fields = (
+            'id',
+            'name',
+            'joined_at',
+        )
+
+class SeminarFromParticipant(serializers.ModelSerializer):
+    id = serializers.IntegerField(source='seminar.id')
+    name = serializers.CharField(source='seminar.name')
+    joined_at = serializers.DateTimeField(source='created_at')
+
+    class Meta:
+        model = UserSeminar
+        fields = (
+            'id',
+            'name',
+            'joined_at',
+            'is_active',
+            'dropped_at',
+        )

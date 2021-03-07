@@ -65,8 +65,8 @@ class SeminarViewSet(viewsets.GenericViewSet):
 
         if self.request.method == 'POST':
             return self.join_seminar(seminar)
-        # else :
-        #     return self.delete_seminar(seminar)
+        elif self.request.method == 'DELETE' :
+            return self.delete_seminar(seminar)
 
 
     def join_seminar(self, seminar):
@@ -102,5 +102,15 @@ class SeminarViewSet(viewsets.GenericViewSet):
             UserSeminar.objects.create(user=user, seminar=seminar, role=role)
             return Response({"Enroll in this seminar as a instructor."}, status=status.HTTP_201_CREATED)
 
-    # def delete_seminar(self, seminar):
-    #     user = self.request.user
+    def delete_seminar(self, seminar):
+        user = self.request.user
+
+        user_seminar = user.user_seminar.filter(seminar=seminar).last()
+
+        if user_seminar :
+            user_seminar.dropped_at = timezone.now()
+            user_seminar.is_active = False
+            user_seminar.save()
+
+        seminar.refresh_from_db()
+        return Response(self.get_serializer(seminar).data)

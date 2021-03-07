@@ -25,5 +25,7 @@ class UserSeminar(models.Model):
 
     user = models.ForeignKey(User, null=True, related_name='user_seminar', on_delete=models.CASCADE)
     seminar = models.ForeignKey(Seminar, null=True, related_name='user_seminar', on_delete=models.CASCADE)
+    is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    dropped_at = models.DateTimeField(null=True)

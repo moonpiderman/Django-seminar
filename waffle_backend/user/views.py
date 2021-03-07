@@ -10,7 +10,7 @@ from rest_framework.response import Response
 from seminar.models import UserSeminar, Seminar
 from user.models import ParticipantProfile, InstructorProfile
 
-from user.serializers import UserSerializer
+from user.serializers import UserSerializer, ParticipantProfileSerializer
 
 
 class UserViewSet(viewsets.GenericViewSet):
@@ -33,7 +33,7 @@ class UserViewSet(viewsets.GenericViewSet):
 
         role = request.data.get('role')
 
-        seminar = request.data.get('seminar')
+        # seminar = request.data.get('seminar')
 
         university = request.data.get('university') or ""
         accepted = request.data.get('accepted')
@@ -45,11 +45,11 @@ class UserViewSet(viewsets.GenericViewSet):
 
         elif role == 'participant':
             ParticipantProfile.objects.create(user=user, university=university, accepted=accepted)
-            UserSeminar.objects.create(user=user, role=role)
+            # UserSeminar.objects.create(user=user, role=role)
 
         elif role == 'instructor':
             InstructorProfile.objects.create(user=user, company=company, year=year)
-            UserSeminar.objects.create(user=user, role=role, seminar=seminar)
+            # UserSeminar.objects.create(user=user, role=role, seminar=seminar)
 
         serializer.save()
 
@@ -104,7 +104,6 @@ class UserViewSet(viewsets.GenericViewSet):
             return Response({"error": "You did not insert role."}, status=status.HTTP_400_BAD_REQUEST)
 
         elif role == 'participant':
-            # ParticipantProfile.objects.filter(user=user).update(university=university, accepted=accepted)
             ParticipantProfile.objects.filter(user_id=user.id).update(university=university, accepted=accepted)
 
         elif role == 'instructor':
@@ -116,3 +115,18 @@ class UserViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         serializer.update(user, serializer.validated_data)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['POST'])
+    def participant(self, request):
+        user = request.user
+
+        university = request.data.get('university')
+        accepted = request.data.get('accepted')
+
+        if hasattr(user, 'participant'):
+            return Response({"error": "You're already a participant"}, status=status.HTTP_400_BAD_REQUEST)
+
+
+        ParticipantProfile.objects.create(university=university, accepted=accepted, user_id=user.id)
+
+        return Response({"new participant from instructor."}, status=status.HTTP_201_CREATED)

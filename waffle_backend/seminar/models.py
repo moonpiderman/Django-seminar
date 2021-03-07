@@ -4,7 +4,6 @@ from django.db import models
 class Seminar(models.Model):
     name = models.CharField(max_length=50)
     capacity = models.PositiveSmallIntegerField(blank=True)
-    now_capacity = models.PositiveSmallIntegerField(default=0)
     count = models.PositiveSmallIntegerField(blank=True)
     time = models.TimeField(default='00:00')
     online = models.BooleanField(default=True)

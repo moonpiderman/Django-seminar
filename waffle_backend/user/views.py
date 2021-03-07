@@ -7,7 +7,6 @@ from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from seminar.models import UserSeminar, Seminar
 from user.models import ParticipantProfile, InstructorProfile
 
 from user.serializers import UserSerializer, ParticipantProfileSerializer
@@ -16,7 +15,7 @@ from user.serializers import UserSerializer, ParticipantProfileSerializer
 class UserViewSet(viewsets.GenericViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
-    permission_classes = (IsAuthenticated(), )
+    permission_classes = (IsAuthenticated, )
 
     def get_permissions(self):
         if self.action in ('create', 'login'):

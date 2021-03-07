@@ -77,9 +77,9 @@ class ParticipantProfileSerializer(serializers.ModelSerializer):
         )
 
     def get_seminars(self, participant_profile):
-        participant_seminar = participant_profile.user.user_seminar.filter(role=UserSeminar.PARTICIPANT).last()
+        participant_seminars = participant_profile.user.user_seminar.filter(role=UserSeminar.PARTICIPANT)
         if participant_profile:
-            SeminarFromParticipant(participant_seminar, context=self.context).data
+            return SeminarFromParticipant(participant_seminars, many=True, context=self.context).data
         return None
 
 class InstructorProfileSerializer(serializers.ModelSerializer):
@@ -95,7 +95,7 @@ class InstructorProfileSerializer(serializers.ModelSerializer):
         )
 
     def get_charge(self, instructor_profile):
-        instructor_seminar = instructor_profile.user.user_seminar.filter(role=UserSeminar.INSTRUCTOR).last()
+        instructor_seminars = instructor_profile.user.user_seminar.filter(role=UserSeminar.INSTRUCTOR).last()
         if instructor_profile:
-            SeminarFromInstructor(instructor_seminar, context=self.context).data
+            return SeminarFromInstructor(instructor_seminars, context=self.context).data
         return None

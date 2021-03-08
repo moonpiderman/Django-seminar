@@ -9,7 +9,7 @@ from rest_framework.response import Response
 
 from user.models import ParticipantProfile, InstructorProfile
 
-from user.serializers import UserSerializer, ParticipantProfileSerializer
+from user.serializers import UserSerializer
 
 
 class UserViewSet(viewsets.GenericViewSet):
@@ -20,7 +20,7 @@ class UserViewSet(viewsets.GenericViewSet):
     def get_permissions(self):
         if self.action in ('create', 'login'):
             return (AllowAny(), )
-        return self.permission_classes
+        return super(UserViewSet, self).get_permissions()
 
     def create(self, request):
         serializer = self.get_serializer(data=request.data)

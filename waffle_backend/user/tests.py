@@ -302,3 +302,147 @@ class PutUserMeTestCase(TestCase):
 
         instructor_user = User.objects.get(username='inst123')
         self.assertEqual(instructor_user.email, 'bdv111@naver.com')
+
+class PutUserLoginTest(TestCase):
+    client = Client()
+
+    def setUp(self):
+        self.client.post(
+            '/api/v1/user/',
+            json.dumps({
+                "username": "moonhulk",
+                "password": "password",
+                "first_name": "Boss",
+                "last_name": "Moon",
+                "email": "lotsofchuck@gmail.com",
+                "role": "participant",
+                "university": "가톨릭대학교"
+            }),
+            content_type='application/json'
+        )
+        self.participant_token = 'Token ' + Token.objects.get(user__username='moonhulk').key
+
+    def test_put_user_login(self):
+        response = self.client.put(
+            '/api/v1/user/login/',
+            json.dumps({
+                "username": "moonhulk",
+                "password": "password"
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        data = response.json()
+        self.assertIn("id", data)
+        self.assertEqual(data["username"], "moonhulk")
+
+    def test_put_user_wrong_login(self):
+        response = self.client.put(
+            '/api/v1/user/login/',
+            json.dumps({
+                "username": "moonhulk"
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+        response = self.client.put(
+            '/api/v1/user/login/',
+            json.dumps({
+                "password": "password"
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+        response = self.client.put(
+            '/api/v1/user/login/',
+            json.dumps({
+                "username": "moonhulk",
+                "password": "pass"
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+class GetUserMeTest(TestCase):
+    client = Client()
+
+    def setUp(self):
+        response = self.client.post(
+            '/api/v1/user/',
+            json.dumps({
+                "username": "moonhulk",
+                "password": "password",
+                "first_name": "Boss",
+                "last_name": "Moon",
+                "email": "lotsofchuck@gmail.com",
+                "role": "participant",
+                "university": "가톨릭대학교"
+            }),
+            content_type='application/json'
+        )
+        self.participant_token = 'Token ' + Token.objects.get(user__username='moonhulk').key
+        self.user_id = response.json()['id']
+
+    def test_get_user_user_id(self):
+        path = f'/api/v1/user/{self.user_id}/'
+        response = self.client.get(
+            path,
+            content_type='application/json',
+            HTTP_AUTHORIZATION=self.participant_token
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+class PostUserParticipant(TestCase):
+    client = Client()
+
+    def setUp(self):
+        self.client.post(
+            '/api/v1/user/',
+            json.dumps({
+                "username": "zldzl1",
+                "password": "password",
+                "first_name": "Eunji",
+                "last_name": "Seo",
+                "email": "bradlover@catholic.ac.kr",
+                "role": "instructor",
+                "year": 1
+            }),
+            content_type='application/json'
+        )
+        self.instructor_token = 'Token ' + Token.objects.get(user__username='zldzl1').key
+
+    # /user/participant/ api test
+    def test_post_user_participant(self):
+        response = self.client.post(
+            '/api/v1/user/participant/',
+            json.dumps({
+                "university": "가톨릭대학교",
+                "accepted": "True"
+            }),
+            content_type='application/json',
+            HTTP_AUTHORIZATION=self.instructor_token
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        response = self.client.post(
+            '/api/v1/user/participant/',
+            json.dumps({
+                "university": "가톨릭대학교"
+            }),
+            content_type='application/json',
+            HTTP_AUTHORIZATION=self.instructor_token
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        response = self.client.post(
+            '/api/v1/user/participant/',
+            json.dumps({
+                "accepted": "True"
+            }),
+            content_type='application/json',
+            HTTP_AUTHORIZATION=self.instructor_token
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

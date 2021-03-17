@@ -5,6 +5,7 @@ from rest_framework import serializers
 from rest_framework.authtoken.models import Token
 
 from rest_framework.response import Response
+from rest_framework import status
 from django.db import IntegrityError
 
 from seminar.models import UserSeminar
@@ -21,7 +22,7 @@ class UserSerializer(serializers.ModelSerializer):
     date_joined = serializers.DateTimeField(read_only=True)
     participant = serializers.SerializerMethodField()
     instructor = serializers.SerializerMethodField()
-    role = serializers.CharField(write_only=True)
+    role = serializers.ChoiceField(write_only=True, choices=UserSeminar.ROLES)
     university = serializers.CharField(write_only=True, allow_blank=True, required=False)
     accepted = serializers.BooleanField(write_only=True, default=True, required=False)
     company = serializers.CharField(write_only=True, allow_blank=True, required=False)
@@ -62,15 +63,16 @@ class UserSerializer(serializers.ModelSerializer):
         role = data.get('role')
         if role == UserSeminar.PARTICIPANT:
             profile_serializer = ParticipantProfileSerializer(data=data, context=self.context)
-            # profile_serializer.is_valid(raise_exception=True)
+            profile_serializer.is_valid(raise_exception=True)
 
         elif role == UserSeminar.INSTRUCTOR:
             profile_serializer = InstructorProfileSerializer(data=data, context=self.context)
-            # profile_serializer.is_valid(raise_exception=True)
+            profile_serializer.is_valid(raise_exception=True)
         else:
             raise serializers.ValidationError("You insert wrong role name.")
+            # return Response({"error": "wrong role."}, status=status.HTTP_400_BAD_REQUEST)
 
-        profile_serializer.is_valid(raise_exception=True)
+        # profile_serializer.is_valid(raise_exception=True)
         return data
 
     @transaction.atomic
@@ -88,6 +90,8 @@ class UserSerializer(serializers.ModelSerializer):
             ParticipantProfile.objects.create(user=user, university=university, accepted=accepted)
         elif role == UserSeminar.INSTRUCTOR:
             InstructorProfile.objects.create(user=user, company=company, year=year)
+        else:
+            return Response({"error": "Wrong role."}, status=status.HTTP_400_BAD_REQUEST)
         return user
 
     @transaction.atomic
@@ -108,10 +112,11 @@ class UserSerializer(serializers.ModelSerializer):
             if company is not None or year:
                 if company is not None :
                     profile_instructor.company = company
-                if year:
+                if year >= 0:
                     profile_instructor.year = year
                 profile_instructor.save()
 
+        print(user.username)
         return super(UserSerializer, self).update(user, validated_data)
 
     def get_participant(self, user):
@@ -139,9 +144,10 @@ class ParticipantProfileSerializer(serializers.ModelSerializer):
 
     def get_seminars(self, participant_profile):
         participant_seminars = participant_profile.user.user_seminar.filter(role=UserSeminar.PARTICIPANT)
-        if participant_profile:
-            return SeminarFromParticipant(participant_seminars, many=True, context=self.context).data
-        return None
+        return SeminarFromParticipant(participant_seminars, many=True, context=self.context).data
+        # if participant_seminars:
+        #     return SeminarFromParticipant(participant_seminars, many=True, context=self.context).data
+        # return None
 
 class InstructorProfileSerializer(serializers.ModelSerializer):
     charge = serializers.SerializerMethodField()
@@ -157,6 +163,7 @@ class InstructorProfileSerializer(serializers.ModelSerializer):
 
     def get_charge(self, instructor_profile):
         instructor_seminars = instructor_profile.user.user_seminar.filter(role=UserSeminar.INSTRUCTOR).last()
-        if instructor_profile:
+        # return SeminarFromInstructor(instructor_seminars, context=self.context).data
+        if instructor_seminars:
             return SeminarFromInstructor(instructor_seminars, context=self.context).data
         return None

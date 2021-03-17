@@ -69,7 +69,12 @@ class UserViewSet(viewsets.GenericViewSet):
         data = request.data.copy()
         data.pop('accepted', None)
 
-        serializer = self.get_serializer(user, data=request.data, partial=True)
+        if hasattr(user, 'participant'):
+            data['role'] = "participant"
+        elif hasattr(user, 'instructor'):
+            data['role'] = "instructor"
+
+        serializer = self.get_serializer(user, data=data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.update(user, serializer.validated_data)
         return Response(serializer.data)
@@ -83,6 +88,7 @@ class UserViewSet(viewsets.GenericViewSet):
 
         if hasattr(user, 'participant'):
             return Response({"error": "You're already a participant"}, status=status.HTTP_400_BAD_REQUEST)
+        elif hasattr(user, 'instructor'):
+            ParticipantProfile.objects.create(university=university, accepted=accepted, user_id=user.id)
 
-        ParticipantProfile.objects.create(university=university, accepted=accepted, user_id=user.id)
         return Response({"new participant from instructor."}, status=status.HTTP_201_CREATED)

@@ -4,6 +4,9 @@ from django.db import transaction
 from rest_framework import serializers
 from rest_framework.authtoken.models import Token
 
+from rest_framework.response import Response
+from django.db import IntegrityError
+
 from seminar.models import UserSeminar
 from user.models import ParticipantProfile, InstructorProfile
 from seminar.serializers import SeminarFromInstructor, SeminarFromParticipant
@@ -18,6 +21,11 @@ class UserSerializer(serializers.ModelSerializer):
     date_joined = serializers.DateTimeField(read_only=True)
     participant = serializers.SerializerMethodField()
     instructor = serializers.SerializerMethodField()
+    role = serializers.CharField(write_only=True)
+    university = serializers.CharField(write_only=True, allow_blank=True, required=False)
+    accepted = serializers.BooleanField(write_only=True, default=True, required=False)
+    company = serializers.CharField(write_only=True, allow_blank=True, required=False)
+    year = serializers.IntegerField(write_only=True, required=False)
 
     class Meta:
         model = User
@@ -33,6 +41,11 @@ class UserSerializer(serializers.ModelSerializer):
             # 'token',
             'participant',
             'instructor',
+            'role',
+            'university',
+            'accepted',
+            'company',
+            'year',
         )
 
     def validate_password(self, value):
@@ -46,13 +59,60 @@ class UserSerializer(serializers.ModelSerializer):
         if first_name and last_name and not (first_name.isalpha() and last_name.isalpha()):
             raise serializers.ValidationError("First name or last name should not have number.")
 
+        role = data.get('role')
+        if role == UserSeminar.PARTICIPANT:
+            profile_serializer = ParticipantProfileSerializer(data=data, context=self.context)
+            # profile_serializer.is_valid(raise_exception=True)
+
+        elif role == UserSeminar.INSTRUCTOR:
+            profile_serializer = InstructorProfileSerializer(data=data, context=self.context)
+            # profile_serializer.is_valid(raise_exception=True)
+        else:
+            raise serializers.ValidationError("You insert wrong role name.")
+
+        profile_serializer.is_valid(raise_exception=True)
         return data
 
     @transaction.atomic
     def create(self, validated_data):
+        role = validated_data.pop('role')
+        university = validated_data.pop('university', '')
+        accepted = validated_data.pop('accepted', None)
+        company = validated_data.pop('company', '')
+        year = validated_data.pop('year', None)
+
         user = super(UserSerializer, self).create(validated_data)
         Token.objects.create(user=user)
+
+        if role == UserSeminar.PARTICIPANT:
+            ParticipantProfile.objects.create(user=user, university=university, accepted=accepted)
+        elif role == UserSeminar.INSTRUCTOR:
+            InstructorProfile.objects.create(user=user, company=company, year=year)
         return user
+
+    @transaction.atomic
+    def update(self, user, validated_data):
+        if hasattr(user, 'participant'):
+            profile_participant = user.participant
+            university = validated_data.get('university')
+
+            if university is not None :
+                profile_participant.university = university
+                profile_participant.save()
+
+        if hasattr(user, 'instructor'):
+            profile_instructor = user.instructor
+            company = validated_data.get('company')
+            year = validated_data.get('year')
+
+            if company is not None or year:
+                if company is not None :
+                    profile_instructor.company = company
+                if year:
+                    profile_instructor.year = year
+                profile_instructor.save()
+
+        return super(UserSerializer, self).update(user, validated_data)
 
     def get_participant(self, user):
         if hasattr(user, 'participant'):
@@ -65,6 +125,7 @@ class UserSerializer(serializers.ModelSerializer):
         return None
 
 class ParticipantProfileSerializer(serializers.ModelSerializer):
+    accepted = serializers.BooleanField(default=True, required=False)
     seminars = serializers.SerializerMethodField()
 
     class Meta :

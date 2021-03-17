@@ -7,19 +7,18 @@ from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from user.models import ParticipantProfile, InstructorProfile
-
+from user.models import ParticipantProfile
 from user.serializers import UserSerializer
 
 
 class UserViewSet(viewsets.GenericViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
-    permission_classes = (IsAuthenticated, )
+    permission_classes = (IsAuthenticated,)
 
     def get_permissions(self):
         if self.action in ('create', 'login'):
-            return (AllowAny(), )
+            return (AllowAny(),)
         return super(UserViewSet, self).get_permissions()
 
     def create(self, request):
@@ -30,34 +29,11 @@ class UserViewSet(viewsets.GenericViewSet):
         except IntegrityError:
             return Response({"error": "A user with that username already exists."}, status=status.HTTP_400_BAD_REQUEST)
 
-        role = request.data.get('role')
-
-        # seminar = request.data.get('seminar')
-
-        university = request.data.get('university') or ""
-        accepted = request.data.get('accepted')
-        company = request.data.get('company') or ""
-        year = request.data.get('year') or ""
-
-        if role != 'participant' and role != 'instructor':
-            return Response({"error": "You did not insert role."}, status=status.HTTP_400_BAD_REQUEST)
-
-        elif role == 'participant':
-            ParticipantProfile.objects.create(user=user, university=university, accepted=accepted)
-            # UserSeminar.objects.create(user=user, role=role)
-
-        elif role == 'instructor':
-            InstructorProfile.objects.create(user=user, company=company, year=year)
-            # UserSeminar.objects.create(user=user, role=role, seminar=seminar)
-
-        serializer.save()
-
         login(request, user)
 
         data = serializer.data
         data['token'] = user.auth_token.key
         return Response(data, status=status.HTTP_201_CREATED)
-
 
     @action(detail=False, methods=['PUT'])
     def login(self, request):
@@ -85,30 +61,13 @@ class UserViewSet(viewsets.GenericViewSet):
         user = request.user if pk == 'me' else self.get_object()
         return Response(self.get_serializer(user).data)
 
-
     def update(self, request, pk=None):
         if pk != 'me':
             return Response({"error": "Can't update other Users information"}, status=status.HTTP_403_FORBIDDEN)
 
         user = request.user
-
-        role = request.data.get('role')
-
-        university = request.data.get('university') or ""
-        accepted = request.data.get('accepted')
-        company = request.data.get('company') or ""
-        year = request.data.get('year') or ""
-
-        if role != 'participant' and role != 'instructor':
-            return Response({"error": "You did not insert role."}, status=status.HTTP_400_BAD_REQUEST)
-
-        elif role == 'participant':
-            ParticipantProfile.objects.filter(user_id=user.id).update(university=university, accepted=accepted)
-
-        elif role == 'instructor':
-            InstructorProfile.objects.filter(user_id=user.id).update(company=company, year=year)
-
-        user.save()
+        data = request.data.copy()
+        data.pop('accepted', None)
 
         serializer = self.get_serializer(user, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
@@ -125,7 +84,5 @@ class UserViewSet(viewsets.GenericViewSet):
         if hasattr(user, 'participant'):
             return Response({"error": "You're already a participant"}, status=status.HTTP_400_BAD_REQUEST)
 
-
         ParticipantProfile.objects.create(university=university, accepted=accepted, user_id=user.id)
-
         return Response({"new participant from instructor."}, status=status.HTTP_201_CREATED)
